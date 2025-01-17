@@ -99,10 +99,23 @@ function renderNoteItem(item, container, note) {
   if (item.type === 'text') {
     const textarea = document.createElement('textarea');
     textarea.value = item.content;
-    textarea.addEventListener('input', () => {
+    textarea.style.resize = 'none';
+    textarea.style.width = '100%';
+    textarea.addEventListener('input', (e) => {
       item.content = textarea.value;
       saveNotes();
+
+      // Adjust the height dynamically
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
     });
+
+    // Initial height adjustment for saved data
+    setTimeout(() => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    });
+
     noteItem.appendChild(textarea);
   } else if (item.type === 'image') {
     const input = document.createElement('input');
