@@ -1,31 +1,69 @@
 const themeSwitch = document.getElementById('themeSwitch');
 const newNoteBtn = document.getElementById('newNoteBtn');
 const notesContainer = document.getElementById('notesContainer');
+let notes = JSON.parse(localStorage.getItem('notes')) || [];
 
-let noteId = 0;
+// Initialize theme
+document.body.dataset.theme = localStorage.getItem('theme') || 'light';
+themeSwitch.checked = document.body.dataset.theme === 'dark';
 
 // Theme toggle
 themeSwitch.addEventListener('change', () => {
-  document.body.dataset.theme = themeSwitch.checked ? 'dark' : 'light';
+  const theme = themeSwitch.checked ? 'dark' : 'light';
+  document.body.dataset.theme = theme;
+  localStorage.setItem('theme', theme);
 });
+
+// Load notes on page load
+window.onload = () => {
+  notes.forEach(note => renderNoteSection(note));
+};
 
 // Create new note section
 newNoteBtn.addEventListener('click', () => {
+  const newNote = { id: Date.now(), items: [] };
+  notes.push(newNote);
+  saveNotes();
+  renderNoteSection(newNote);
+});
+
+// Render note section
+function renderNoteSection(note) {
   const noteSection = document.createElement('div');
   noteSection.classList.add('note-section');
-  noteSection.id = `note-${noteId++}`;
+  noteSection.dataset.id = note.id;
+
+  // Actions: Add Item, Delete Section
+  const actions = document.createElement('div');
+  actions.classList.add('actions');
 
   const addItemBtn = document.createElement('button');
   addItemBtn.textContent = 'Add Item';
   addItemBtn.classList.add('btn');
-  addItemBtn.addEventListener('click', () => addItem(noteSection));
+  addItemBtn.addEventListener('click', () => addItem(note, noteSection));
 
-  noteSection.appendChild(addItemBtn);
+  const deleteBtn = document.createElement('button');
+  deleteBtn.textContent = 'Delete Section';
+  deleteBtn.classList.add('btn', 'btn-delete');
+  deleteBtn.addEventListener('click', () => deleteNoteSection(note, noteSection));
+
+  actions.appendChild(addItemBtn);
+  actions.appendChild(deleteBtn);
+  noteSection.appendChild(actions);
+
+  // Items container
+  const itemsContainer = document.createElement('div');
+  itemsContainer.classList.add('items-container');
+  noteSection.appendChild(itemsContainer);
+
+  // Render existing items
+  note.items.forEach(item => renderNoteItem(item, itemsContainer, note));
+
   notesContainer.appendChild(noteSection);
-});
+}
 
 // Add item to the note section
-function addItem(section) {
+function addItem(note, noteSection) {
   const select = document.createElement('select');
   select.innerHTML = `
     <option value="text">Text</option>
@@ -37,18 +75,36 @@ function addItem(section) {
   const confirmBtn = document.createElement('button');
   confirmBtn.textContent = 'Add';
   confirmBtn.classList.add('btn');
-  confirmBtn.addEventListener('click', () => handleItemAddition(select.value, section));
+  confirmBtn.addEventListener('click', () => {
+    const itemType = select.value;
+    const newItem = { id: Date.now(), type: itemType, content: '' };
+    note.items.push(newItem);
+    saveNotes();
 
-  section.appendChild(select);
-  section.appendChild(confirmBtn);
+    const itemsContainer = noteSection.querySelector('.items-container');
+    renderNoteItem(newItem, itemsContainer, note);
+    select.remove();
+    confirmBtn.remove();
+  });
+
+  noteSection.appendChild(select);
+  noteSection.appendChild(confirmBtn);
 }
 
-function handleItemAddition(type, section) {
-  if (type === 'text') {
+// Render note item
+function renderNoteItem(item, container, note) {
+  const noteItem = document.createElement('div');
+  noteItem.classList.add('note-item');
+
+  if (item.type === 'text') {
     const textarea = document.createElement('textarea');
-    textarea.placeholder = 'Enter text here...';
-    section.appendChild(textarea);
-  } else if (type === 'image') {
+    textarea.value = item.content;
+    textarea.addEventListener('input', () => {
+      item.content = textarea.value;
+      saveNotes();
+    });
+    noteItem.appendChild(textarea);
+  } else if (item.type === 'image') {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -56,10 +112,12 @@ function handleItemAddition(type, section) {
       const img = document.createElement('img');
       img.src = URL.createObjectURL(e.target.files[0]);
       img.style.maxWidth = '100%';
-      section.appendChild(img);
+      noteItem.appendChild(img);
+      item.content = img.src;
+      saveNotes();
     });
-    section.appendChild(input);
-  } else if (type === 'file') {
+    noteItem.appendChild(input);
+  } else if (item.type === 'file') {
     const input = document.createElement('input');
     input.type = 'file';
     input.addEventListener('change', (e) => {
@@ -67,10 +125,12 @@ function handleItemAddition(type, section) {
       const fileButton = document.createElement('button');
       fileButton.textContent = fileName;
       fileButton.classList.add('btn');
-      section.appendChild(fileButton);
+      noteItem.appendChild(fileButton);
+      item.content = fileName;
+      saveNotes();
     });
-    section.appendChild(input);
-  } else if (type === 'link') {
+    noteItem.appendChild(input);
+  } else if (item.type === 'link') {
     const linkInput = document.createElement('input');
     linkInput.type = 'text';
     linkInput.placeholder = 'Enter URL';
@@ -82,9 +142,35 @@ function handleItemAddition(type, section) {
       link.href = linkInput.value;
       link.target = '_blank';
       link.textContent = linkInput.value || 'Link';
-      section.appendChild(link);
+      noteItem.appendChild(link);
+      item.content = linkInput.value;
+      saveNotes();
     });
-    section.appendChild(linkInput);
-    section.appendChild(linkBtn);
+    noteItem.appendChild(linkInput);
+    noteItem.appendChild(linkBtn);
   }
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.classList.add('btn', 'btn-delete');
+  deleteBtn.addEventListener('click', () => {
+    note.items = note.items.filter(i => i.id !== item.id);
+    saveNotes();
+    noteItem.remove();
+  });
+
+  noteItem.appendChild(deleteBtn);
+  container.appendChild(noteItem);
+}
+
+// Delete note section
+function deleteNoteSection(note, noteSection) {
+  notes = notes.filter(n => n.id !== note.id);
+  saveNotes();
+  noteSection.remove();
+}
+
+// Save notes to localStorage
+function saveNotes() {
+  localStorage.setItem('notes', JSON.stringify(notes));
 }
